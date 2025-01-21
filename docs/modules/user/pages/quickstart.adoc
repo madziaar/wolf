@@ -65,6 +65,12 @@ Nvidia (Container Toolkit)::
 
 [WARNING]
 ====
+This **isn't recommended at the moment** as it's not as stable as the manual method. +
+You can follow https://github.com/games-on-whales/wolf/issues/152[issue #152] for updates.
+====
+
+[NOTE]
+====
 Make sure that the version of the Nvidia container toolkit is `>= 1.16.0` and that your driver version is `>= 530.30.02` (you can check the driver version with `nvidia-smi`).
 
 [source,bash]
@@ -134,6 +140,7 @@ services:
     network_mode: host
     restart: unless-stopped
 ....
+
 One last final check: we have to make sure that the `nvidia-drm` module has been loaded and that the module is loaded with the flag `modeset=1`.
 
 [source,bash]
@@ -159,6 +166,11 @@ Then `sudo update-grub` and *reboot*.
 Nvidia (Manual)::
 +
 --
+
+[WARNING]
+====
+The downside of this method is that you have to manually re-create the Nvidia driver volume every time you update the drivers.
+====
 
 Unfortunately, on Nvidia, things are a little bit more complex..
 
@@ -339,6 +351,7 @@ First, create a new file `nvidia.conf` in the `/etc/modules-load.d/` directory a
 `nano /etc/modules-load.d/nvidia.conf`
 
 paste the following content to the file:
+
 ```
 nvidia
 nvidia_uvm
@@ -401,6 +414,7 @@ Proxmox LXC::
 ====
 At the moment it is only possible to run Wolf inside a privileged LXC.
 ====
+
 First you need to make sure your GPU drivers are installed and loaded on your PVE host.
 
 Also make sure to add the virtual devices udev rules to the PVE host as explained in the xref:quickstart.adoc#_virtual_devices_support[Virtual devices support] section.
@@ -411,7 +425,8 @@ Now, we need to edit LXC config file to passtrough the GPU.
 [%collapsible]
 ====
 
-The easiest way to create an LXC to run Wolf is to use https://tteck.github.io/Proxmox/#docker-lxc[tteck's PVE docker script], this will create you a LXC with docker already good to go. (Make sure you choose privileged LXC and install docker-compose when prompted)
+The easiest way to create an LXC to run Wolf is to use https://tteck.github.io/Proxmox/#docker-lxc[tteck's PVE docker script], this will create you a LXC with docker already good to go.
+(Make sure you choose privileged LXC and install docker-compose when prompted)
 
 ====
 
