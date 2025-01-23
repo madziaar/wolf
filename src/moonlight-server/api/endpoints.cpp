@@ -61,7 +61,7 @@ void UnixSocketServer::endpoint_UnpairClient(const HTTPRequest &req, std::shared
         }
 
         const auto& payload = payload_result.value();  // Unwrap the Result
-        auto client = state::get_client_by_id(this->state_->app_state->config, std::stoul(payload.client_id));
+        auto client = state::get_client_by_id(this->state_->app_state->config, std::stoul(payload.client_id.get()));
         if (!client) {
             auto res = GenericErrorResponse{.error = "Client not found"};
             send_http(socket, 404, rfl::json::write(res));
