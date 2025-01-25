@@ -36,7 +36,7 @@ struct PendingPairRequestsResponse {
 };
 
 struct PairedClient {
-  std::size_t client_id;
+  std::string client_id;
   std::string app_state_folder;
 };
 

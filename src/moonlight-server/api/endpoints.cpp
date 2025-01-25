@@ -46,7 +46,7 @@ void UnixSocketServer::endpoint_PairedClients(const HTTPRequest &req, std::share
   auto clients = state_->app_state->config->paired_clients->load();
   for (const auto &client : clients.get()) {
     res.clients.push_back(
-        PairedClient{.client_id = state::get_client_id(client), .app_state_folder = client->app_state_folder});
+        PairedClient{.client_id = std::to_string(state::get_client_id(client)), .app_state_folder = client->app_state_folder});
   }
   send_http(socket, 200, rfl::json::write(res));
 }
