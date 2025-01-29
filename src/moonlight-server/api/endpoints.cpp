@@ -326,6 +326,7 @@ void UnixSocketServer::endpoint_UpdateClientSettings(const HTTPRequest &req, std
   auto current_settings = current_client->settings;
   auto new_settings = payload.settings.get();
   auto merged_client = config::PairedClient{
+      .client_cert = current_client->client_cert, // Immutable, changing this would mean a new client
       .app_state_folder = payload.app_state_folder.get().value_or(current_client->app_state_folder),
       .settings = config::ClientSettings{
           .run_uid = new_settings.run_gid.value_or(current_settings.run_uid),
