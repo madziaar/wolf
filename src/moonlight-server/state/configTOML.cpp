@@ -305,66 +305,71 @@ void unpair(const Config &cfg, const PairedClient &client) {
   rfl::toml::save(cfg.config_source, tml);
 }
 
-void update_client_settings(const Config &cfg, 
-                          const std::string &client_id,
-                          const std::optional<std::string> &new_folder,
-                          const PartialClientSettings &settings_update) {
-    // Get existing client first
-    auto client = get_client_by_id(cfg, client_id);
-    if (!client) {
-        throw std::runtime_error(fmt::format("Client with id {} not found", client_id));
-    }
+void update_client_settings(const Config &cfg,
+                            const std::string &client_id,
+                            const std::optional<std::string> &new_folder,
+                            const PartialClientSettings &settings_update) {
+  // Get existing client first
+  auto client = get_client_by_id(cfg, client_id);
+  if (!client) {
+    throw std::runtime_error(fmt::format("Client with id {} not found", client_id));
+  }
 
-    // Merge new settings with existing ones
-    auto merged_settings = client->settings;
-    // Only update fields that are present in the update
-    if (settings_update.run_uid) merged_settings.run_uid = *settings_update.run_uid;
-    if (settings_update.run_gid) merged_settings.run_gid = *settings_update.run_gid;
-    if (settings_update.controllers_override) merged_settings.controllers_override = *settings_update.controllers_override;
-    if (settings_update.mouse_acceleration) merged_settings.mouse_acceleration = *settings_update.mouse_acceleration;
-    if (settings_update.v_scroll_acceleration) merged_settings.v_scroll_acceleration = *settings_update.v_scroll_acceleration;
-    if (settings_update.h_scroll_acceleration) merged_settings.h_scroll_acceleration = *settings_update.h_scroll_acceleration;
+  // Merge new settings with existing ones
+  auto merged_settings = client->settings;
+  // Only update fields that are present in the update
+  if (settings_update.run_uid)
+    merged_settings.run_uid = *settings_update.run_uid;
+  if (settings_update.run_gid)
+    merged_settings.run_gid = *settings_update.run_gid;
+  if (settings_update.controllers_override)
+    merged_settings.controllers_override = *settings_update.controllers_override;
+  if (settings_update.mouse_acceleration)
+    merged_settings.mouse_acceleration = *settings_update.mouse_acceleration;
+  if (settings_update.v_scroll_acceleration)
+    merged_settings.v_scroll_acceleration = *settings_update.v_scroll_acceleration;
+  if (settings_update.h_scroll_acceleration)
+    merged_settings.h_scroll_acceleration = *settings_update.h_scroll_acceleration;
 
-    // Update the in-memory config atomically
-    auto client_id_num = std::stoull(client_id);
-    cfg.paired_clients->update([&](const state::PairedClientList &paired_clients) {
-        return paired_clients
-            | ranges::views::transform([&](const immer::box<PairedClient>& client) -> immer::box<PairedClient> {
-                auto id = get_client_id(*client);
-                if (id == client_id_num) {
-                    return immer::box<PairedClient>(PairedClient{
-                        .client_cert = client->client_cert,
-                        .app_state_folder = new_folder.value_or(client->app_state_folder),
-                        .settings = merged_settings
-                    });
-                }
-                return client;
-            })
-            | ranges::to<state::PairedClientList>();
-    });
-    
-    // Update the TOML file
-    auto toml_config = rfl::toml::load<WolfConfig, rfl::DefaultIfMissing>(cfg.config_source).value();
-    
-    bool found = false;
-    for (auto &toml_client : toml_config.paired_clients) {
-        auto id = get_client_id(toml_client);
-        if (id == client_id_num) {
-            if (new_folder) {
-                toml_client.app_state_folder = *new_folder;
-            }
-            toml_client.settings = merged_settings;
-            found = true;
-            break;
-        }
-    }
-    
-    if (!found) {
-        throw std::runtime_error(fmt::format("Client with id {} not found", client_id));
-    }
+  // Update the in-memory config atomically
+  auto client_id_num = std::stoull(client_id);
+  cfg.paired_clients->update([&](const state::PairedClientList &paired_clients) {
+    return paired_clients |
+           ranges::views::transform([&](const immer::box<PairedClient> &client) -> immer::box<PairedClient> {
+             auto id = get_client_id(*client);
+             if (id == client_id_num) {
+               return immer::box<PairedClient>(
+                   PairedClient{.client_cert = client->client_cert,
+                                .app_state_folder = new_folder.value_or(client->app_state_folder),
+                                .settings = merged_settings});
+             }
+             return client;
+           }) |
+           ranges::to<state::PairedClientList>();
+  });
 
-    // Save back to file
-    rfl::toml::save(cfg.config_source, toml_config);
+  // Update the TOML file
+  auto toml_config = rfl::toml::load<WolfConfig, rfl::DefaultIfMissing>(cfg.config_source).value();
+
+  bool found = false;
+  for (auto &toml_client : toml_config.paired_clients) {
+    auto id = get_client_id(toml_client);
+    if (id == client_id_num) {
+      if (new_folder) {
+        toml_client.app_state_folder = *new_folder;
+      }
+      toml_client.settings = merged_settings;
+      found = true;
+      break;
+    }
+  }
+
+  if (!found) {
+    throw std::runtime_error(fmt::format("Client with id {} not found", client_id));
+  }
+
+  // Save back to file
+  rfl::toml::save(cfg.config_source, toml_config);
 }
 
 } // namespace state

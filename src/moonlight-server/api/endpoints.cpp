@@ -45,37 +45,37 @@ void UnixSocketServer::endpoint_PairedClients(const HTTPRequest &req, std::share
   auto res = PairedClientsResponse{.success = true};
   auto clients = state_->app_state->config->paired_clients->load();
   for (const auto &client : clients.get()) {
-    res.clients.push_back(
-        PairedClient{.client_id = std::to_string(state::get_client_id(client)), .app_state_folder = client->app_state_folder});
+    res.clients.push_back(PairedClient{.client_id = std::to_string(state::get_client_id(client)),
+                                       .app_state_folder = client->app_state_folder});
   }
   send_http(socket, 200, rfl::json::write(res));
 }
 
 void UnixSocketServer::endpoint_UnpairClient(const HTTPRequest &req, std::shared_ptr<UnixSocket> socket) {
-    try {
-        auto payload_result = rfl::json::read<UnpairClientRequest>(req.body);
-        if (!payload_result) {
-            auto res = GenericErrorResponse{.error = "Invalid request format"};
-            send_http(socket, 400, rfl::json::write(res));
-            return;
-        }
-
-        const auto& payload = payload_result.value();  // Unwrap the Result
-        auto client = state::get_client_by_id(this->state_->app_state->config, payload.client_id);
-        if (!client) {
-            auto res = GenericErrorResponse{.error = "Client not found"};
-            send_http(socket, 404, rfl::json::write(res));
-            return;
-        }
-
-        state::unpair(this->state_->app_state->config, *client);
-
-        auto res = GenericSuccessResponse{.success = true};
-        send_http(socket, 200, rfl::json::write(res));
-    } catch (const std::exception &e) {
-        auto res = GenericErrorResponse{.error = e.what()};
-        send_http(socket, 500, rfl::json::write(res));
+  try {
+    auto payload_result = rfl::json::read<UnpairClientRequest>(req.body);
+    if (!payload_result) {
+      auto res = GenericErrorResponse{.error = "Invalid request format"};
+      send_http(socket, 400, rfl::json::write(res));
+      return;
     }
+
+    const auto &payload = payload_result.value(); // Unwrap the Result
+    auto client = state::get_client_by_id(this->state_->app_state->config, payload.client_id.value());
+    if (!client) {
+      auto res = GenericErrorResponse{.error = "Client not found"};
+      send_http(socket, 404, rfl::json::write(res));
+      return;
+    }
+
+    state::unpair(this->state_->app_state->config, *client);
+
+    auto res = GenericSuccessResponse{.success = true};
+    send_http(socket, 200, rfl::json::write(res));
+  } catch (const std::exception &e) {
+    auto res = GenericErrorResponse{.error = e.what()};
+    send_http(socket, 500, rfl::json::write(res));
+  }
 }
 
 void UnixSocketServer::endpoint_Apps(const HTTPRequest &req, std::shared_ptr<UnixSocket> socket) {
@@ -307,40 +307,33 @@ void UnixSocketServer::endpoint_RunnerStart(const wolf::api::HTTPRequest &req, s
 }
 
 void UnixSocketServer::endpoint_UpdateClientSettings(const HTTPRequest &req, std::shared_ptr<UnixSocket> socket) {
-    try {
-        auto payload_result = rfl::json::read<UpdateClientSettingsRequest>(req.body);
-        if (!payload_result) {
-            auto res = GenericErrorResponse{.error = "Invalid request format"};
-            send_http(socket, 400, rfl::json::write(res));
-            return;
-        }
-
-        const auto& payload = payload_result.value();
-        
-        // Get the values from the Description fields - keep client_id as string
-        const std::string& client_id = payload.client_id.get();
-        const auto& app_state_folder = payload.app_state_folder;
-        const auto& settings = payload.settings.get();
-        
-        // Update the client settings
-        try {
-            state::update_client_settings(
-                this->state_->app_state->config,
-                client_id,  // Pass as string
-                app_state_folder,
-                settings
-            );
-            
-            auto res = GenericSuccessResponse{.success = true};
-            send_http(socket, 200, rfl::json::write(res));
-        } catch (const std::runtime_error& e) {
-            auto res = GenericErrorResponse{.error = e.what()};
-            send_http(socket, 404, rfl::json::write(res));
-        }
-    } catch (const std::exception &e) {
-        auto res = GenericErrorResponse{.error = e.what()};
-        send_http(socket, 500, rfl::json::write(res));
+  try {
+    auto payload_result = rfl::json::read<UpdateClientSettingsRequest>(req.body);
+    if (!payload_result) {
+      auto res = GenericErrorResponse{.error = "Invalid request format"};
+      send_http(socket, 400, rfl::json::write(res));
+      return;
     }
+
+    const auto &payload = payload_result.value();
+
+    // Update the client settings
+    try {
+      state::update_client_settings(this->state_->app_state->config,
+                                    payload.client_id.value(),
+                                    payload.app_state_folder.value(),
+                                    payload.settings.value());
+
+      auto res = GenericSuccessResponse{.success = true};
+      send_http(socket, 200, rfl::json::write(res));
+    } catch (const std::runtime_error &e) {
+      auto res = GenericErrorResponse{.error = e.what()};
+      send_http(socket, 404, rfl::json::write(res));
+    }
+  } catch (const std::exception &e) {
+    auto res = GenericErrorResponse{.error = e.what()};
+    send_http(socket, 500, rfl::json::write(res));
+  }
 }
 
 } // namespace wolf::api

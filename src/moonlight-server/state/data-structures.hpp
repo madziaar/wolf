@@ -227,12 +227,12 @@ const static immer::array<moonlight::DisplayMode> DISPLAY_CONFIGURATIONS = {{
 }};
 
 struct PartialClientSettings {
-    std::optional<uint> run_uid;
-    std::optional<uint> run_gid;
-    std::optional<std::vector<wolf::config::ControllerType>> controllers_override;
-    std::optional<float> mouse_acceleration;
-    std::optional<float> v_scroll_acceleration;
-    std::optional<float> h_scroll_acceleration;
+  std::optional<uint> run_uid;
+  std::optional<uint> run_gid;
+  std::optional<std::vector<wolf::config::ControllerType>> controllers_override;
+  std::optional<float> mouse_acceleration;
+  std::optional<float> v_scroll_acceleration;
+  std::optional<float> h_scroll_acceleration;
 };
 
 } // namespace state
