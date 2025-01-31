@@ -15,9 +15,9 @@ void UnixSocketServer::endpoint_Events(const HTTPRequest &req, std::shared_ptr<U
 }
 
 void UnixSocketServer::endpoint_PendingPairRequest(const HTTPRequest &req, std::shared_ptr<UnixSocket> socket) {
-  auto requests = std::vector<PairRequest>();
+  auto requests = std::vector<PendingPairClient>();
   for (auto [secret, pair_request] : *(state_->app_state)->pairing_atom->load()) {
-    requests.push_back({.pair_secret = secret, .pin = pair_request->client_ip});
+    requests.push_back({.pair_secret = secret, .client_ip = pair_request->client_ip});
   }
   send_http(socket, 200, rfl::json::write(PendingPairRequestsResponse{.requests = requests}));
 }
@@ -44,9 +44,10 @@ void UnixSocketServer::endpoint_Pair(const HTTPRequest &req, std::shared_ptr<Uni
 void UnixSocketServer::endpoint_PairedClients(const HTTPRequest &req, std::shared_ptr<UnixSocket> socket) {
   auto res = PairedClientsResponse{.success = true};
   auto clients = state_->app_state->config->paired_clients->load();
-  for (const auto &client : clients.get()) {
+  for (const config::PairedClient &client : clients.get()) {
     res.clients.push_back(PairedClient{.client_id = std::to_string(state::get_client_id(client)),
-                                       .app_state_folder = client->app_state_folder});
+                                       .app_state_folder = client.app_state_folder,
+                                       .settings = client.settings});
   }
   send_http(socket, 200, rfl::json::write(res));
 }
@@ -324,7 +325,7 @@ void UnixSocketServer::endpoint_UpdateClientSettings(const HTTPRequest &req, std
 
   // Edit only the settings that are being passed in the payload
   auto current_settings = current_client->settings;
-  auto new_settings = payload.settings.get();
+  auto new_settings = payload.settings.get().value_or(PartialClientSettings{});
   auto merged_client = config::PairedClient{
       .client_cert = current_client->client_cert, // Immutable, changing this would mean a new client
       .app_state_folder = payload.app_state_folder.get().value_or(current_client->app_state_folder),

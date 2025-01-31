@@ -12,6 +12,11 @@ using namespace wolf::core;
 
 void start_server(immer::box<state::AppState> app_state);
 
+struct PendingPairClient {
+  std::string pair_secret;
+  rfl::Description<"The IP of the remote Moonlight client", std::string> client_ip;
+};
+
 struct PairRequest {
   std::string pair_secret;
   rfl::Description<"The PIN created by the remote Moonlight client", std::string> pin;
@@ -32,12 +37,13 @@ struct GenericErrorResponse {
 
 struct PendingPairRequestsResponse {
   bool success = true;
-  std::vector<PairRequest> requests;
+  std::vector<PendingPairClient> requests;
 };
 
 struct PairedClient {
   std::string client_id;
   std::string app_state_folder;
+  config::ClientSettings settings = {};
 };
 
 struct PairedClientsResponse {

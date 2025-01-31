@@ -115,10 +115,17 @@ TEST_CASE("Pair APIs", "[API]") {
   // Checkout the list of paired clients (there will be one in the test config file)
   response = req(curl.get(), HTTPMethod::GET, "http://localhost/api/v1/clients");
   REQUIRE(response);
-  REQUIRE_THAT(
-      response->second,
-      Equals("{\"success\":true,\"clients\":[{\"client_id\":\"10594003729173467913\",\"app_state_folder\":\"some/"
-             "folder\"}]}"));
+  REQUIRE_THAT(response->second,
+               Equals("{\"success\":true,\"clients\":["
+                      "{\"client_id\":\"10594003729173467913\","
+                      "\"app_state_folder\":\"some/folder\","
+                      "\"settings\":{"
+                      "\"run_uid\":1234,"
+                      "\"run_gid\":5678,"
+                      "\"controllers_override\":[\"PS\"],"
+                      "\"mouse_acceleration\":2.5,"
+                      "\"v_scroll_acceleration\":1.5,"
+                      "\"h_scroll_acceleration\":10.199999809265137}}]}"));
 
   auto pair_promise = std::make_shared<boost::promise<std::string>>();
 
@@ -132,7 +139,7 @@ TEST_CASE("Pair APIs", "[API]") {
   response = req(curl.get(), HTTPMethod::GET, "http://localhost/api/v1/pair/pending");
   REQUIRE(response);
   REQUIRE_THAT(response->second,
-               Equals("{\"success\":true,\"requests\":[{\"pair_secret\":\"secret\",\"pin\":\"1234\"}]}"));
+               Equals("{\"success\":true,\"requests\":[{\"pair_secret\":\"secret\",\"client_ip\":\"1234\"}]}"));
 
   // Let's complete the pairing process
   response = req(curl.get(),
