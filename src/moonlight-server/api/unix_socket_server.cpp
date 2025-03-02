@@ -225,7 +225,7 @@ void UnixSocketServer::sse_keepalive(const boost::system::error_code &e) {
   }
   cleanup_sockets();
   sse_broadcast(":keepalive\n\n");
-  state_->sse_keepalive_timer.expires_from_now(SSE_KEEPALIVE_INTERVAL);
+  state_->sse_keepalive_timer.expires_after(SSE_KEEPALIVE_INTERVAL);
   state_->sse_keepalive_timer.async_wait([this](auto e) { sse_keepalive(e); });
 }
 

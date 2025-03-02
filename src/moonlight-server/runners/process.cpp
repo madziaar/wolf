@@ -1,4 +1,4 @@
-#include <boost/asio/io_service.hpp>
+#include <boost/asio/io_context.hpp>
 #include <control/control.hpp>
 #include <events/events.hpp>
 #include <future>
@@ -20,7 +20,7 @@ void RunProcess::run(std::size_t session_id,
   logs::log(logs::debug, "[PROCESS] Starting process: {}", this->run_cmd);
 
   std::future<std::string> std_out, err_out;
-  boost::asio::io_service ios;
+  boost::asio::io_context ios;
   bp::child child_proc;
   bp::group group_proc;
 
