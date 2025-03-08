@@ -193,6 +193,9 @@ void UnixSocketServer::endpoint_StreamSessionAdd(const HTTPRequest &req, std::sh
         ss.audio_channel_count);
     new_session->ip = ss.client_ip; // Needed in order to match `/serverinfo`
 
+    new_session->aes_key = ss.aes_key;
+    new_session->aes_iv = ss.aes_iv;
+
     state_->app_state->running_sessions->update(
         [new_session](const immer::vector<events::StreamSession> &ses_v) { return ses_v.push_back(*new_session); });
     state_->app_state->event_bus->fire_event(immer::box<events::StreamSession>(*new_session));
