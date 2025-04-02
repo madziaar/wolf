@@ -157,6 +157,7 @@ void start_audio_producer(std::size_t session_id,
  */
 void start_streaming_video(const immer::box<events::VideoSession> &video_session,
                            const std::shared_ptr<events::EventBusType> &event_bus,
+                           std::string client_ip,
                            unsigned short client_port) {
   std::string color_range = (video_session->color_range == events::ColorRange::JPEG) ? "jpeg" : "mpeg2";
   std::string color_space;
@@ -179,7 +180,7 @@ void start_streaming_video(const immer::box<events::VideoSession> &video_session
                               fmt::arg("fps", video_session->display_mode.refreshRate),
                               fmt::arg("bitrate", video_session->bitrate_kbps),
                               fmt::arg("client_port", client_port),
-                              fmt::arg("client_ip", video_session->client_ip),
+                              fmt::arg("client_ip", client_ip),
                               fmt::arg("payload_size", video_session->packet_size),
                               fmt::arg("fec_percentage", video_session->fec_percentage),
                               fmt::arg("min_required_fec_packets", video_session->min_required_fec_packets),
@@ -247,6 +248,7 @@ void start_streaming_video(const immer::box<events::VideoSession> &video_session
  */
 void start_streaming_audio(const immer::box<events::AudioSession> &audio_session,
                            const std::shared_ptr<events::EventBusType> &event_bus,
+                           std::string client_ip,
                            unsigned short client_port,
                            const std::string &sink_name,
                            const std::string &server_name) {
@@ -266,7 +268,7 @@ void start_streaming_audio(const immer::box<events::AudioSession> &audio_session
       fmt::arg("aes_iv", audio_session->aes_iv),
       fmt::arg("encrypt", audio_session->encrypt_audio),
       fmt::arg("client_port", client_port),
-      fmt::arg("client_ip", audio_session->client_ip),
+      fmt::arg("client_ip", client_ip),
       fmt::arg("host_port", audio_session->port));
   logs::log(logs::debug, "Starting audio pipeline: \n{}", pipeline);
 

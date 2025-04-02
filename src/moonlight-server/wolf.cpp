@@ -361,18 +361,33 @@ auto setup_sessions_handlers(const immer::box<state::AppState> &app_state,
         }).detach();
       }));
 
+  struct PingInfo {
+    unsigned short port;
+    std::string ip;
+  };
   // Video streaming pipeline
   handlers.push_back(app_state->event_bus->register_handler<immer::box<events::VideoSession>>(
       [=](const immer::box<events::VideoSession> &sess) {
         std::thread([=]() {
-          boost::promise<unsigned short> port_promise;
-          auto port_fut = port_promise.get_future();
+          boost::promise<PingInfo> ping_promise;
+          auto ping_fut = ping_promise.get_future();
           std::once_flag called;
           auto ev_handler = app_state->event_bus->register_handler<immer::box<events::RTPVideoPingEvent>>(
-              [pp = std::ref(port_promise), &called, sess](const immer::box<events::RTPVideoPingEvent> &ping_ev) {
+              [pp = std::ref(ping_promise), &called, sess](const immer::box<events::RTPVideoPingEvent> &ping_ev) {
                 std::call_once(called, [=]() { // We'll keep receiving PING requests, but we only want the first one
-                  if (ping_ev->client_ip == sess->client_ip) {
-                    pp.get().set_value(ping_ev->client_port); // This throws when set multiple times
+                  auto ip = sess->client_ip;
+                  bool matches = ping_ev->client_ip == ip;
+
+                  if (auto client_ip = utils::get_env("WOLF_STREAM_CLIENT_IP")) {
+                    logs::log(logs::debug, "Client IP override: {}", client_ip);
+                    matches |= ip == std::string(client_ip);
+                  }
+
+                  if (matches) {
+                    pp.get().set_value({
+                      .ip = ping_ev->client_ip,
+                      .port = ping_ev->client_port
+                    }); // This throws when set multiple times
                   }
                 });
               });
@@ -389,14 +404,17 @@ auto setup_sessions_handlers(const immer::box<state::AppState> &app_state,
           logs::log(logs::debug, "Video session {}, waiting for PING...", sess->session_id);
 
           // Stop here until we get a PING
+          std::string client_ip = "";
           unsigned short client_port = 0;
           if (sess->wait_for_ping) {
-            auto status = port_fut.wait_for(boost::chrono::milliseconds(DEFAULT_SESSION_TIMEOUT_MILLIS));
+            auto status = ping_fut.wait_for(boost::chrono::milliseconds(DEFAULT_SESSION_TIMEOUT_MILLIS));
             if (status != boost::future_status::ready) {
               logs::log(logs::warning, "Video session {} timed out waiting for PING", sess->session_id);
               return;
             }
-            client_port = port_fut.get();
+            auto ping_info = ping_fut.get();
+            client_port = ping_info.port;
+            client_ip = ping_info.ip;
             cancel_event.unregister();
             ev_handler.unregister();
 
@@ -405,7 +423,7 @@ auto setup_sessions_handlers(const immer::box<state::AppState> &app_state,
             }
           }
 
-          streaming::start_streaming_video(sess, app_state->event_bus, client_port);
+          streaming::start_streaming_video(sess, app_state->event_bus, client_ip, client_port);
         }).detach();
       }));
 
@@ -413,14 +431,26 @@ auto setup_sessions_handlers(const immer::box<state::AppState> &app_state,
   handlers.push_back(app_state->event_bus->register_handler<immer::box<events::AudioSession>>(
       [=](const immer::box<events::AudioSession> &sess) {
         std::thread([=]() {
-          boost::promise<unsigned short> port_promise;
-          auto port_fut = port_promise.get_future();
+          boost::promise<PingInfo> ping_promise;
+          auto ping_fut = ping_promise.get_future();
           std::once_flag called;
           auto ev_handler = app_state->event_bus->register_handler<immer::box<events::RTPAudioPingEvent>>(
-              [pp = std::ref(port_promise), &called, sess](const immer::box<events::RTPAudioPingEvent> &ping_ev) {
+              [pp = std::ref(ping_promise), &called, sess](const immer::box<events::RTPAudioPingEvent> &ping_ev) {
                 std::call_once(called, [=]() { // We'll keep receiving PING requests, but we only want the first one
-                  if (ping_ev->client_ip == sess->client_ip) {
-                    pp.get().set_value(ping_ev->client_port); // This throws when set multiple times
+                  auto ip = sess->client_ip;
+                  bool matches = ping_ev->client_ip == ip;
+
+                  if (auto client_ip = utils::get_env("WOLF_STREAM_CLIENT_IP")) {
+                    logs::log(logs::debug, "Client IP override: {}", client_ip);
+                    matches |= ip == std::string(client_ip);
+                  }
+
+
+                  if (matches) {
+                    pp.get().set_value({
+                      .ip = ping_ev->client_ip,
+                      .port = ping_ev->client_port
+                    }); // This throws when set multiple times
                   }
                 });
               });
@@ -437,14 +467,17 @@ auto setup_sessions_handlers(const immer::box<state::AppState> &app_state,
           logs::log(logs::debug, "Audio session {}, waiting for PING...", sess->session_id);
 
           // Stop here until we get a PING
+          std::string client_ip = "";
           unsigned short client_port = 0;
           if (sess->wait_for_ping) {
-            auto status = port_fut.wait_for(boost::chrono::milliseconds(DEFAULT_SESSION_TIMEOUT_MILLIS));
+            auto status = ping_fut.wait_for(boost::chrono::milliseconds(DEFAULT_SESSION_TIMEOUT_MILLIS));
             if (status != boost::future_status::ready) {
               logs::log(logs::warning, "Audio session {} timed out waiting for PING", sess->session_id);
               return;
             }
-            client_port = port_fut.get();
+            auto ping_info = ping_fut.get();
+            client_port = ping_info.port;
+            client_ip = ping_info.ip;
             cancel_event.unregister();
             ev_handler.unregister();
 
@@ -458,7 +491,7 @@ auto setup_sessions_handlers(const immer::box<state::AppState> &app_state,
           auto sink_name = fmt::format("virtual_sink_{}.monitor", sess->session_id);
           auto server_name = audio_server_name ? audio_server_name.value() : "";
 
-          streaming::start_streaming_audio(sess, app_state->event_bus, client_port, sink_name, server_name);
+          streaming::start_streaming_audio(sess, app_state->event_bus, client_ip, client_port, sink_name, server_name);
         }).detach();
       }));
 

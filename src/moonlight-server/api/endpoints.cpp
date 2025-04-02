@@ -2,6 +2,7 @@
 #include <control/input_handler.hpp>
 #include <state/config.hpp>
 #include <state/sessions.hpp>
+#include <rtp/udp-ping.hpp>
 
 namespace wolf::api {
 
@@ -141,6 +142,25 @@ void UnixSocketServer::endpoint_StreamSessions(const HTTPRequest &req, std::shar
   send_http(socket, 200, rfl::json::write(res));
 }
 
+void start_rtp_ping(const wolf::core::events::StreamSession &session) {
+
+  // Video RTP Ping
+  rtp::wait_for_ping(session.video_stream_port,
+                     [ev_bus = session.event_bus](unsigned short client_port, const std::string &client_ip) {
+                       logs::log(logs::trace, "[PING] video from {}:{}", client_ip, client_port);
+                       auto ev = wolf::core::events::RTPVideoPingEvent{.client_ip = client_ip, .client_port = client_port};
+                       ev_bus->fire_event(immer::box<wolf::core::events::RTPVideoPingEvent>(ev));
+                     });
+
+  // Audio RTP Ping
+  rtp::wait_for_ping(session.audio_stream_port,
+                     [ev_bus = session.event_bus](unsigned short client_port, const std::string &client_ip) {
+                       logs::log(logs::trace, "[PING] audio from {}:{}", client_ip, client_port);
+                       auto ev = wolf::core::events::RTPAudioPingEvent{.client_ip = client_ip, .client_port = client_port};
+                       ev_bus->fire_event(immer::box<wolf::core::events::RTPAudioPingEvent>(ev));
+                     });
+}
+
 void UnixSocketServer::endpoint_StreamSessionAdd(const HTTPRequest &req, std::shared_ptr<UnixSocket> socket) {
   auto session = rfl::json::read<rfl::Reflector<wolf::core::events::StreamSession>::ReflType>(req.body);
   if (session) {
@@ -173,9 +193,14 @@ void UnixSocketServer::endpoint_StreamSessionAdd(const HTTPRequest &req, std::sh
         ss.audio_channel_count);
     new_session->ip = ss.client_ip; // Needed in order to match `/serverinfo`
 
+    new_session->aes_key = ss.aes_key;
+    new_session->aes_iv = ss.aes_iv;
+
     state_->app_state->running_sessions->update(
         [new_session](const immer::vector<events::StreamSession> &ses_v) { return ses_v.push_back(*new_session); });
     state_->app_state->event_bus->fire_event(immer::box<events::StreamSession>(*new_session));
+
+    start_rtp_ping(*new_session);
 
     auto res = StreamSessionCreated{.success = true, .session_id = std::to_string(new_session->session_id)};
     send_http(socket, 200, rfl::json::write(res));

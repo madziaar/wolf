@@ -32,10 +32,12 @@ void start_audio_producer(std::size_t session_id,
 
 void start_streaming_video(const immer::box<events::VideoSession> &video_session,
                            const std::shared_ptr<events::EventBusType> &event_bus,
+                           std::string client_ip,
                            unsigned short client_port);
 
 void start_streaming_audio(const immer::box<events::AudioSession> &audio_session,
                            const std::shared_ptr<events::EventBusType> &event_bus,
+                           std::string client_ip,
                            unsigned short client_port,
                            const std::string &sink_name,
                            const std::string &server_name);
