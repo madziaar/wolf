@@ -13,34 +13,6 @@ namespace state {
 
 using namespace wolf::core;
 
-inline std::optional<events::StreamSession> get_session_by_ip(const immer::vector<events::StreamSession> &sessions,
-                                                              const std::string &ip) {
-  auto results = sessions |                                                                                      //
-                 ranges::views::filter([&ip](const events::StreamSession &session) { return session.ip == ip; }) //
-                 | ranges::views::take(1)                                                                        //
-                 | ranges::to_vector;                                                                            //
-  if (results.size() == 1) {
-    return results[0];
-  } else if (results.empty()) {
-    // If no sessions for specific IP, try to find wildcard
-    if (auto wildcardIP = utils::get_env("WOLF_STREAM_CLIENT_IP")) {
-      std::string ipString = wildcardIP;
-      auto newResults = sessions |                                                                                      //
-                 ranges::views::filter([&ip,&ipString](const events::StreamSession &session) { return session.ip == ipString; }) //
-                 | ranges::views::take(1)                                                                        //
-                 | ranges::to_vector;
-      if (newResults.size() == 1) {
-        return newResults[0];
-      }
-    }
-
-    return {};
-  } else {
-    logs::log(logs::warning, "Found multiple sessions for a given IP: {}", ip);
-    return {};
-  }
-}
-
 inline std::optional<events::StreamSession> get_session_by_id(const immer::vector<events::StreamSession> &sessions,
                                                               const std::size_t id) {
   auto results =
@@ -81,7 +53,9 @@ inline std::shared_ptr<events::StreamSession> create_stream_session(immer::box<s
                                                                     const events::App &run_app,
                                                                     const wolf::config::PairedClient &current_client,
                                                                     const moonlight::DisplayMode &display_mode,
-                                                                    int audio_channel_count) {
+                                                                    int audio_channel_count,
+                                                                    const std::string &aes_key,
+                                                                    const std::string &aes_iv) {
   std::string host_state_folder = utils::get_env("HOST_APPS_STATE_FOLDER", "/etc/wolf");
   auto full_path = std::filesystem::path(host_state_folder) / current_client.app_state_folder / run_app.base.title;
   logs::log(logs::debug, "Host app state folder: {}, creating paths", full_path.string());
@@ -91,7 +65,7 @@ inline std::shared_ptr<events::StreamSession> create_stream_session(immer::box<s
   auto audio_stream_port = get_next_available_port(state->running_sessions->load(), false);
 
   auto rtp_secret = crypto::random(16);
-  std::array<char, 16> rtp_secret_payload;
+  std::array<uint8_t, 16> rtp_secret_payload;
   std::copy(rtp_secret.begin(), rtp_secret.end(), rtp_secret_payload.begin());
 
   auto enet_secret = crypto::random(4);
@@ -104,9 +78,17 @@ inline std::shared_ptr<events::StreamSession> create_stream_session(immer::box<s
                                        .app = std::make_shared<events::App>(run_app),
                                        .app_state_folder = full_path.string(),
 
+                                       .aes_key = aes_key,
+                                       .aes_iv = aes_iv,
+
                                        // Moonlight protocol extension to support IP-less connections
                                        .rtp_secret_payload = rtp_secret_payload,
                                        .enet_secret_payload = enet_secret_payload,
+                                       .rtsp_fake_ip = fmt::format("{}.{}.{}.{}",
+                                                                   rtp_secret_payload[0],
+                                                                   rtp_secret_payload[1],
+                                                                   rtp_secret_payload[2],
+                                                                   rtp_secret_payload[3]),
 
                                        // client info
                                        .session_id = state::get_client_id(current_client),

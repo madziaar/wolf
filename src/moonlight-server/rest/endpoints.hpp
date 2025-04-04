@@ -385,12 +385,21 @@ auto create_run_session(const SimpleWeb::CaseInsensitiveMultimap &headers,
   auto surround_info = std::stoi(get_header(headers, "surroundAudioInfo").value_or("196610"));
   int channelCount = surround_info & (0xffff /* last 16 bits */);
 
-  auto base_session = create_stream_session(state, run_app, current_client, display_mode, channelCount);
+  auto base_session = create_stream_session(state,
+                                            run_app,
+                                            current_client,
+                                            display_mode,
+                                            channelCount,
+                                            get_header(headers, "rikey").value(),
+                                            get_header(headers, "rikeyid").value());
 
   base_session->ip = client_ip;
-  base_session->aes_key = get_header(headers, "rikey").value();
-  base_session->aes_iv = get_header(headers, "rikeyid").value();
   return std::move(base_session);
+}
+
+std::string get_rtsp_ip_string(const std::string &local_ip, const events::StreamSession &session) {
+  auto use_fake_ip = utils::get_env("WOLF_USE_RTSP_FAKE_IP", "TRUE") == "TRUE"s;
+  return use_fake_ip ? session.rtsp_fake_ip : local_ip;
 }
 
 void launch(const std::shared_ptr<typename SimpleWeb::Server<SimpleWeb::HTTPS>::Response> &response,
@@ -414,8 +423,8 @@ void launch(const std::shared_ptr<typename SimpleWeb::Server<SimpleWeb::HTTPS>::
 
   rtp::start_rtp_ping(*new_session);
 
-  auto xml =
-      moonlight::launch_success(get_host_ip<SimpleWeb::HTTPS>(request, state), std::to_string(state::RTSP_SETUP_PORT));
+  auto rtsp_ip = get_rtsp_ip_string(get_host_ip<SimpleWeb::HTTPS>(request, state), *new_session);
+  auto xml = moonlight::launch_success(rtsp_ip, std::to_string(state::RTSP_SETUP_PORT));
   send_xml<SimpleWeb::HTTPS>(response, SimpleWeb::StatusCode::success_ok, xml);
 }
 
@@ -444,16 +453,15 @@ void resume(const std::shared_ptr<typename SimpleWeb::Server<SimpleWeb::HTTPS>::
     state->running_sessions->update([&old_session, new_session](const immer::vector<events::StreamSession> ses_v) {
       return state::remove_session(ses_v, old_session.value()).push_back(*new_session);
     });
+
+    auto rtsp_ip = get_rtsp_ip_string(get_host_ip<SimpleWeb::HTTPS>(request, state), *new_session);
+    auto xml = moonlight::launch_resume(rtsp_ip, std::to_string(state::RTSP_SETUP_PORT));
+    send_xml<SimpleWeb::HTTPS>(response, SimpleWeb::StatusCode::success_ok, xml);
   } else {
     logs::log(logs::warning, "[HTTPS] Received resume event from an unregistered session, ip: {}", client_ip);
   }
 
-  XML xml;
-  xml.put("root.<xmlattr>.status_code", 200);
-  xml.put("root.sessionUrl0",
-          "rtsp://"s + get_host_ip<SimpleWeb::HTTPS>(request, state) + ':' + std::to_string(state::RTSP_SETUP_PORT));
-  xml.put("root.resume", 1);
-  send_xml<SimpleWeb::HTTPS>(response, SimpleWeb::StatusCode::success_ok, xml);
+  server_error<SimpleWeb::HTTPS>(response);
 }
 
 void cancel(const std::shared_ptr<typename SimpleWeb::Server<SimpleWeb::HTTPS>::Response> &response,

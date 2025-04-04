@@ -18,7 +18,7 @@ struct RTPPingEvent {
    * will send back what was originally exchanged over RTSP
    * (see: X-SS-Ping-Payload and X-SS-Connect-Data)
    */
-  std::optional<std::array<char, 16>> payload;
+  std::optional<std::array<uint8_t, 16>> payload;
 };
 
 using on_rtp_ping_fn = std::function<void(const RTPPingEvent &)>;
