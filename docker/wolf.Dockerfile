@@ -30,6 +30,10 @@ RUN apt-get update -y && \
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
 ENV PATH="$HOME/.cargo/bin:${PATH}"
 
+ARG RUST_VERSION=1.85.1
+ENV RUST_VERSION=$RUST_VERSION
+RUN rustup install $RUST_VERSION && rustup default $RUST_VERSION
+
 WORKDIR /tmp/
 RUN <<_GST_WAYLAND_DISPLAY
     #!/bin/bash
@@ -38,7 +42,7 @@ RUN <<_GST_WAYLAND_DISPLAY
     git clone https://github.com/games-on-whales/gst-wayland-display
     cd gst-wayland-display
     git checkout a31f5a0
-    cargo install cargo-c
+    cargo install --locked cargo-c
     cargo cinstall -p c-bindings --prefix=/usr/local --libdir=/usr/local/lib/
 _GST_WAYLAND_DISPLAY
 
