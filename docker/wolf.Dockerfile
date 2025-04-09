@@ -131,10 +131,10 @@ EXPOSE 47989/tcp
 EXPOSE 47999/udp
 # RTSP
 EXPOSE 48010/tcp
-# Video (up to 10 users)
-EXPOSE 48100-48110/udp
-# Audio (up to 10 users)
-EXPOSE 48200-48210/udp
+# Video
+EXPOSE 48100/udp
+# Audio
+EXPOSE 48200/udp
 
 LABEL org.opencontainers.image.source="https://github.com/games-on-whales/wolf/"
 LABEL org.opencontainers.image.description="Wolf: stream virtual desktops and games in Docker"

@@ -160,12 +160,14 @@ struct StopStreamEvent {
 struct RTPVideoPingEvent {
   std::string client_ip;
   unsigned short client_port;
+  rfl::Skip<std::shared_ptr<boost::asio::ip::udp::socket>> video_socket;
   std::optional<std::array<char, 16>> payload;
 };
 
 struct RTPAudioPingEvent {
   std::string client_ip;
   unsigned short client_port;
+  rfl::Skip<std::shared_ptr<boost::asio::ip::udp::socket>> audio_socket;
   std::optional<std::array<char, 16>> payload;
 };
 
@@ -253,6 +255,7 @@ struct StreamSession {
 
   unsigned short video_stream_port;
   unsigned short audio_stream_port;
+  unsigned short control_stream_port;
 
   /**
    * Optional: the wayland display for the current session.

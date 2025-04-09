@@ -387,10 +387,14 @@ auto setup_sessions_handlers(const immer::box<state::AppState> &app_state,
               (!ping_ev->payload.has_value() && ping_ev->client_ip == sess->client_ip &&
                ping_ev->client_port == sess->port)) { // Legacy IP+port matching when no payload has been passed
             // Found a session waiting for a ping, remove it from the list (we want to call this once)
-            video_waiting_list->update([id = sess->session_id](auto &s) { return remove_session(s, id); });
+            video_waiting_list->update([id = sess->session_id](auto s) { return remove_session(s, id); });
             // Start streaming
-            std::thread([sess, ev_bus, ping_ev]() {
-              streaming::start_streaming_video(sess, ev_bus, ping_ev->client_ip, ping_ev->client_port);
+            std::thread([sess,
+                         ev_bus,
+                         ip = ping_ev->client_ip,
+                         port = ping_ev->client_port,
+                         socket = ping_ev->video_socket.get()]() {
+              streaming::start_streaming_video(sess, ev_bus, ip, port, socket);
             }).detach();
           }
         }
@@ -417,20 +421,20 @@ auto setup_sessions_handlers(const immer::box<state::AppState> &app_state,
               (!ping_ev->payload.has_value() && ping_ev->client_ip == sess->client_ip &&
                ping_ev->client_port == sess->port)) { // Legacy IP+port matching when no payload has been passed
             // Found a session waiting for a ping, remove it from the list (we want to call this once)
-            audio_waiting_list->update([id = sess->session_id](auto &s) { return remove_session(s, id); });
-            std::thread([audio_server, sess, ev_bus, ping_ev]() {
+            audio_waiting_list->update([id = sess->session_id](auto s) { return remove_session(s, id); });
+            std::thread([audio_server,
+                         sess,
+                         ev_bus,
+                         ip = ping_ev->client_ip,
+                         port = ping_ev->client_port,
+                         socket = ping_ev->audio_socket.get()]() {
               // Start streaming
               auto audio_server_name = audio_server ? audio::get_server_name(audio_server->server)
                                                     : std::optional<std::string>();
               auto sink_name = fmt::format("virtual_sink_{}.monitor", sess->session_id);
               auto server_name = audio_server_name ? audio_server_name.value() : "";
 
-              streaming::start_streaming_audio(sess,
-                                               ev_bus,
-                                               ping_ev->client_ip,
-                                               ping_ev->client_port,
-                                               sink_name,
-                                               server_name);
+              streaming::start_streaming_audio(sess, ev_bus, ip, port, socket, sink_name, server_name);
             }).detach();
           }
         }
@@ -458,24 +462,29 @@ void run() {
   // HTTP APIs
   auto http_thread = std::thread([local_state]() {
     HttpServer server = HttpServer();
-    HTTPServers::startServer(&server, local_state, state::HTTP_PORT);
+    HTTPServers::startServer(&server, local_state, state::get_port(state::HTTP_PORT));
   });
 
   // HTTPS APIs
   std::thread([local_state, p_key_file, p_cert_file]() {
     HttpsServer server = HttpsServer(p_cert_file, p_key_file);
-    HTTPServers::startServer(&server, local_state, state::HTTPS_PORT);
+    HTTPServers::startServer(&server, local_state, state::get_port(state::HTTPS_PORT));
   }).detach();
 
   // RTSP
   std::thread([sessions = local_state->running_sessions]() {
-    rtsp::run_server(state::RTSP_SETUP_PORT, sessions);
+    rtsp::run_server(state::get_port(state::RTSP_SETUP_PORT), sessions);
   }).detach();
 
   // Control
   std::thread([sessions = local_state->running_sessions, ev_bus = local_state->event_bus]() {
-    control::run_control(state::CONTROL_PORT, sessions, ev_bus);
+    control::run_control(state::get_port(state::CONTROL_PORT), sessions, ev_bus);
   }).detach();
+
+  // RTP
+  rtp::start_rtp_ping(state::get_port(state::VIDEO_PING_PORT),
+                      state::get_port(state::AUDIO_PING_PORT),
+                      local_state->event_bus);
 
   // Wolf API server
   std::thread([local_state]() { wolf::api::start_server(local_state); }).detach();

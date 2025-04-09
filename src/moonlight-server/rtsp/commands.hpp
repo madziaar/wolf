@@ -126,7 +126,7 @@ RTSP_PACKET setup(const RTSP_PACKET &req, const events::StreamSession &session) 
     break;
   }
   case utils::hash("control"): {
-    options["Transport"] = "server_port=" + std::to_string(state::CONTROL_PORT);
+    options["Transport"] = "server_port=" + std::to_string(session.control_stream_port);
     options["X-SS-Connect-Data"] = std::to_string(session.enet_secret_payload);
     break;
   }

@@ -65,8 +65,8 @@ void serverinfo(const std::shared_ptr<typename SimpleWeb::Server<T>::Response> &
 
   auto xml = moonlight::serverinfo(is_busy,
                                    app_id,
-                                   state::HTTPS_PORT,
-                                   state::HTTP_PORT,
+                                   get_port(state::HTTPS_PORT),
+                                   get_port(state::HTTP_PORT),
                                    cfg->uuid,
                                    cfg->hostname,
                                    utils::lazy_value_or(host->mac_address, [&]() { return get_mac_address(local_ip); }),
@@ -421,8 +421,6 @@ void launch(const std::shared_ptr<typename SimpleWeb::Server<SimpleWeb::HTTPS>::
   state->running_sessions->update(
       [new_session](const immer::vector<events::StreamSession> &ses_v) { return ses_v.push_back(*new_session); });
 
-  rtp::start_rtp_ping(new_session->video_stream_port, new_session->audio_stream_port, new_session->event_bus);
-
   auto rtsp_ip = get_rtsp_ip_string(get_host_ip<SimpleWeb::HTTPS>(request, state), *new_session);
   auto xml = moonlight::launch_success(rtsp_ip, std::to_string(state::RTSP_SETUP_PORT));
   send_xml<SimpleWeb::HTTPS>(response, SimpleWeb::StatusCode::success_ok, xml);
@@ -447,8 +445,6 @@ void resume(const std::shared_ptr<typename SimpleWeb::Server<SimpleWeb::HTTPS>::
     new_session->joypads = std::move(old_session->joypads);
     new_session->pen_tablet = std::move(old_session->pen_tablet);
     new_session->touch_screen = std::move(old_session->touch_screen);
-
-    rtp::start_rtp_ping(new_session->video_stream_port, new_session->audio_stream_port, new_session->event_bus);
 
     state->running_sessions->update([&old_session, new_session](const immer::vector<events::StreamSession> ses_v) {
       return state::remove_session(ses_v, old_session.value()).push_back(*new_session);

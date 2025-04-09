@@ -36,19 +36,6 @@ inline std::optional<events::StreamSession> get_session_by_client(const immer::v
   return get_session_by_id(sessions, client_id);
 }
 
-inline unsigned short get_next_available_port(const immer::vector<events::StreamSession> &sessions, bool video) {
-  auto ports = sessions |                                                               //
-               ranges::views::transform([video](const events::StreamSession &session) { //
-                 return video ? session.video_stream_port : session.audio_stream_port;  //
-               })                                                                       //
-               | ranges::to_vector;
-  unsigned short port = video ? state::VIDEO_PING_PORT : state::AUDIO_PING_PORT;
-  while (std::find(ports.begin(), ports.end(), port) != ports.end()) {
-    port++;
-  }
-  return port;
-}
-
 inline std::shared_ptr<events::StreamSession> create_stream_session(immer::box<state::AppState> state,
                                                                     const events::App &run_app,
                                                                     const wolf::config::PairedClient &current_client,
@@ -60,9 +47,6 @@ inline std::shared_ptr<events::StreamSession> create_stream_session(immer::box<s
   auto full_path = std::filesystem::path(host_state_folder) / current_client.app_state_folder / run_app.base.title;
   logs::log(logs::debug, "Host app state folder: {}, creating paths", full_path.string());
   std::filesystem::create_directories(full_path);
-
-  auto video_stream_port = get_next_available_port(state->running_sessions->load(), true);
-  auto audio_stream_port = get_next_available_port(state->running_sessions->load(), false);
 
   std::random_device rd;
   std::mt19937 generator(rd());
@@ -94,9 +78,10 @@ inline std::shared_ptr<events::StreamSession> create_stream_session(immer::box<s
                                        .rtsp_fake_ip = rtsp_fake_ip,
 
                                        // client info
-                                       .session_id = state::get_client_id(current_client),
-                                       .video_stream_port = video_stream_port,
-                                       .audio_stream_port = audio_stream_port};
+                                       .session_id = get_client_id(current_client),
+                                       .video_stream_port = static_cast<unsigned short>(get_port(VIDEO_PING_PORT)),
+                                       .audio_stream_port = static_cast<unsigned short>(get_port(AUDIO_PING_PORT)),
+                                       .control_stream_port = static_cast<unsigned short>(get_port(CONTROL_PORT))};
 
   return std::make_shared<events::StreamSession>(session);
 }
