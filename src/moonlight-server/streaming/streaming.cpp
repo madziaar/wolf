@@ -166,7 +166,7 @@ send_buffer(std::shared_ptr<GstBuffer> buffer, std::shared_ptr<GstSample> sample
   if (gst_buffer_map(buffer.get(), &map, GST_MAP_READ)) {
     std::shared_ptr<GstMapInfo> map_ptr = std::make_shared<GstMapInfo>(map);
     if (!udp_sink->socket->is_open()) {
-      logs::log(logs::debug, "UDP Socket is not open");
+      logs::log(logs::warning, "UDP Socket is not open");
       udp_sink->socket->open(udp::v4());
     }
     udp_sink->socket->async_send_to(
