@@ -140,7 +140,6 @@ std::optional<AudioServer> setup_audio_server(const std::string &runtime_dir) {
 
 using session_devices = immer::map<std::size_t /* session_id */, std::shared_ptr<events::devices_atom_queue>>;
 
-
 /**
  * Will stop the execution until an event of type RTPPingType is triggered
  * and the signature is matching the input `sess`.
