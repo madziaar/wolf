@@ -27,8 +27,6 @@ using namespace std::string_literals;
 using namespace std::chrono_literals;
 using namespace wolf::core;
 
-static constexpr int DEFAULT_SESSION_TIMEOUT_MILLIS = 4000;
-
 /**
  * @brief Will try to load the config file and fallback to defaults
  */
@@ -141,6 +139,36 @@ std::optional<AudioServer> setup_audio_server(const std::string &runtime_dir) {
 }
 
 using session_devices = immer::map<std::size_t /* session_id */, std::shared_ptr<events::devices_atom_queue>>;
+
+/**
+ * Will stop the execution until an event of type RTPPingType is triggered
+ * and the signature is matching the input `sess`.
+ * Returns the RTPPingType event
+ */
+template <typename RTPPingType>
+immer::box<RTPPingType> wait_for_ping(std::shared_ptr<events::EventBusType> ev_bus, const auto &sess) {
+  auto ping_promise = std::make_shared<std::promise<RTPPingType>>();
+  auto ping_future = ping_promise->get_future();
+
+  auto handler =
+      ev_bus->register_handler<immer::box<RTPPingType>>([sess, ping_promise](const immer::box<RTPPingType> &ping_ev) {
+        // Check if this ping is for our session
+        if (sess->rtp_secret_payload == ping_ev->payload || // Secret payload matching
+            (!ping_ev->payload.has_value() && ping_ev->client_ip == sess->client_ip &&
+             ping_ev->client_port == sess->port)) { // Legacy IP+port matching when no payload has been passed
+          // Resolve the promise with the ping event data
+          ping_promise->set_value(*ping_ev);
+        }
+      });
+
+  // Wait for the promise to be fulfilled
+  auto ping_ev = ping_future.get();
+
+  // Unregister the handler since we only need it once
+  handler.unregister();
+
+  return ping_ev;
+}
 
 auto setup_sessions_handlers(const immer::box<state::AppState> &app_state,
                              const std::string &runtime_dir,
@@ -361,104 +389,40 @@ auto setup_sessions_handlers(const immer::box<state::AppState> &app_state,
         }).detach();
       }));
 
-  // Video streaming pipeline
   handlers.push_back(app_state->event_bus->register_handler<immer::box<events::VideoSession>>(
-      [=](const immer::box<events::VideoSession> &sess) {
-        std::thread([=]() {
-          boost::promise<unsigned short> port_promise;
-          auto port_fut = port_promise.get_future();
-          std::once_flag called;
-          auto ev_handler = app_state->event_bus->register_handler<immer::box<events::RTPVideoPingEvent>>(
-              [pp = std::ref(port_promise), &called, sess](const immer::box<events::RTPVideoPingEvent> &ping_ev) {
-                std::call_once(called, [=]() { // We'll keep receiving PING requests, but we only want the first one
-                  if (ping_ev->client_ip == sess->client_ip) {
-                    pp.get().set_value(ping_ev->client_port); // This throws when set multiple times
-                  }
-                });
-              });
+      [ev_bus = app_state->event_bus](const immer::box<events::VideoSession> &sess) {
+        // Start a thread that will wait for the RTP ping event
+        std::thread([sess, ev_bus]() {
+          auto ping_ev = wait_for_ping<events::RTPVideoPingEvent>(ev_bus, sess);
 
-          std::shared_ptr<std::atomic_bool> cancel_job = std::make_shared<std::atomic<bool>>(false);
-          auto cancel_event = app_state->event_bus->register_handler<immer::box<events::VideoSession>>(
-              [=](const immer::box<events::VideoSession> &new_sess) {
-                if (new_sess->session_id == sess->session_id) {
-                  // A new VideoSession has been queued whilst we still haven't received a PING
-                  *cancel_job = true;
-                }
-              });
-
-          logs::log(logs::debug, "Video session {}, waiting for PING...", sess->session_id);
-
-          // Stop here until we get a PING
-          unsigned short client_port = 0;
-          if (sess->wait_for_ping) {
-            auto status = port_fut.wait_for(boost::chrono::milliseconds(DEFAULT_SESSION_TIMEOUT_MILLIS));
-            if (status != boost::future_status::ready) {
-              logs::log(logs::warning, "Video session {} timed out waiting for PING", sess->session_id);
-              return;
-            }
-            client_port = port_fut.get();
-            cancel_event.unregister();
-            ev_handler.unregister();
-
-            if (*cancel_job) {
-              return;
-            }
-          }
-
-          streaming::start_streaming_video(sess, app_state->event_bus, client_port);
+          // Start streaming
+          streaming::start_streaming_video(sess,
+                                           ev_bus,
+                                           ping_ev->client_ip,
+                                           ping_ev->client_port,
+                                           ping_ev->video_socket.get());
         }).detach();
       }));
 
-  // Audio streaming pipeline
   handlers.push_back(app_state->event_bus->register_handler<immer::box<events::AudioSession>>(
-      [=](const immer::box<events::AudioSession> &sess) {
-        std::thread([=]() {
-          boost::promise<unsigned short> port_promise;
-          auto port_fut = port_promise.get_future();
-          std::once_flag called;
-          auto ev_handler = app_state->event_bus->register_handler<immer::box<events::RTPAudioPingEvent>>(
-              [pp = std::ref(port_promise), &called, sess](const immer::box<events::RTPAudioPingEvent> &ping_ev) {
-                std::call_once(called, [=]() { // We'll keep receiving PING requests, but we only want the first one
-                  if (ping_ev->client_ip == sess->client_ip) {
-                    pp.get().set_value(ping_ev->client_port); // This throws when set multiple times
-                  }
-                });
-              });
+      [ev_bus = app_state->event_bus, audio_server](const immer::box<events::AudioSession> &sess) {
+        // Start a thread that will wait for the RTP ping event
+        std::thread([sess, ev_bus, audio_server]() {
+          auto ping_ev = wait_for_ping<events::RTPAudioPingEvent>(ev_bus, sess);
 
-          std::shared_ptr<std::atomic_bool> cancel_job = std::make_shared<std::atomic<bool>>(false);
-          auto cancel_event = app_state->event_bus->register_handler<immer::box<events::AudioSession>>(
-              [=](const immer::box<events::AudioSession> &new_sess) {
-                if (new_sess->session_id == sess->session_id) {
-                  // A new AudioSession has been queued whilst we still haven't received a PING
-                  *cancel_job = true;
-                }
-              });
-
-          logs::log(logs::debug, "Audio session {}, waiting for PING...", sess->session_id);
-
-          // Stop here until we get a PING
-          unsigned short client_port = 0;
-          if (sess->wait_for_ping) {
-            auto status = port_fut.wait_for(boost::chrono::milliseconds(DEFAULT_SESSION_TIMEOUT_MILLIS));
-            if (status != boost::future_status::ready) {
-              logs::log(logs::warning, "Audio session {} timed out waiting for PING", sess->session_id);
-              return;
-            }
-            client_port = port_fut.get();
-            cancel_event.unregister();
-            ev_handler.unregister();
-
-            if (*cancel_job) {
-              return;
-            }
-          }
-
+          // Start streaming
           auto audio_server_name = audio_server ? audio::get_server_name(audio_server->server)
                                                 : std::optional<std::string>();
           auto sink_name = fmt::format("virtual_sink_{}.monitor", sess->session_id);
           auto server_name = audio_server_name ? audio_server_name.value() : "";
 
-          streaming::start_streaming_audio(sess, app_state->event_bus, client_port, sink_name, server_name);
+          streaming::start_streaming_audio(sess,
+                                           ev_bus,
+                                           ping_ev->client_ip,
+                                           ping_ev->client_port,
+                                           ping_ev->audio_socket.get(),
+                                           sink_name,
+                                           server_name);
         }).detach();
       }));
 
@@ -484,24 +448,29 @@ void run() {
   // HTTP APIs
   auto http_thread = std::thread([local_state]() {
     HttpServer server = HttpServer();
-    HTTPServers::startServer(&server, local_state, state::HTTP_PORT);
+    HTTPServers::startServer(&server, local_state, state::get_port(state::HTTP_PORT));
   });
 
   // HTTPS APIs
   std::thread([local_state, p_key_file, p_cert_file]() {
     HttpsServer server = HttpsServer(p_cert_file, p_key_file);
-    HTTPServers::startServer(&server, local_state, state::HTTPS_PORT);
+    HTTPServers::startServer(&server, local_state, state::get_port(state::HTTPS_PORT));
   }).detach();
 
   // RTSP
   std::thread([sessions = local_state->running_sessions]() {
-    rtsp::run_server(state::RTSP_SETUP_PORT, sessions);
+    rtsp::run_server(state::get_port(state::RTSP_SETUP_PORT), sessions);
   }).detach();
 
   // Control
   std::thread([sessions = local_state->running_sessions, ev_bus = local_state->event_bus]() {
-    control::run_control(state::CONTROL_PORT, sessions, ev_bus);
+    control::run_control(state::get_port(state::CONTROL_PORT), sessions, ev_bus);
   }).detach();
+
+  // RTP
+  rtp::start_rtp_ping(state::get_port(state::VIDEO_PING_PORT),
+                      state::get_port(state::AUDIO_PING_PORT),
+                      local_state->event_bus);
 
   // Wolf API server
   std::thread([local_state]() { wolf::api::start_server(local_state); }).detach();

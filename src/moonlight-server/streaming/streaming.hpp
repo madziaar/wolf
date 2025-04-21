@@ -1,23 +1,21 @@
 #pragma once
-#include "moonlight/fec.hpp"
 #include <boost/asio.hpp>
 #include <core/gstreamer.hpp>
 #include <core/virtual-display.hpp>
 #include <events/events.hpp>
-#include <fmt/core.h>
 #include <fmt/format.h>
 #include <gst-plugin/gstrtpmoonlightpay_audio.hpp>
 #include <gst-plugin/gstrtpmoonlightpay_video.hpp>
 #include <gst-plugin/video.hpp>
 #include <gst/gst.h>
-#include <gstreamer-1.0/gst/app/gstappsink.h>
-#include <gstreamer-1.0/gst/app/gstappsrc.h>
 #include <immer/box.hpp>
 #include <memory>
+#include <moonlight/fec.hpp>
 
 namespace streaming {
 
 using namespace wolf::core;
+using boost::asio::ip::udp;
 
 void start_video_producer(std::size_t session_id,
                           wolf::core::virtual_display::wl_state_ptr wl_state,
@@ -30,13 +28,17 @@ void start_audio_producer(std::size_t session_id,
                           const std::string &sink_name,
                           const std::string &server_name);
 
-void start_streaming_video(const immer::box<events::VideoSession> &video_session,
+void start_streaming_video(immer::box<events::VideoSession> video_session,
                            const std::shared_ptr<events::EventBusType> &event_bus,
-                           unsigned short client_port);
-
-void start_streaming_audio(const immer::box<events::AudioSession> &audio_session,
-                           const std::shared_ptr<events::EventBusType> &event_bus,
+                           std::string client_ip,
                            unsigned short client_port,
+                           std::shared_ptr<udp::socket> video_socket);
+
+void start_streaming_audio(immer::box<events::AudioSession> audio_session,
+                           const std::shared_ptr<events::EventBusType> &event_bus,
+                           std::string client_ip,
+                           unsigned short client_port,
+                           std::shared_ptr<udp::socket> audio_socket,
                            const std::string &sink_name,
                            const std::string &server_name);
 
@@ -79,11 +81,8 @@ inline void init() {
   gst_init(nullptr, nullptr);
   logs::log(logs::info, "Gstreamer version: {}", get_gst_version());
 
-  GstPlugin *video_plugin = gst_plugin_load_by_name("rtpmoonlightpay_video");
-  gst_element_register(video_plugin, "rtpmoonlightpay_video", GST_RANK_PRIMARY, gst_TYPE_rtp_moonlight_pay_video);
-
-  GstPlugin *audio_plugin = gst_plugin_load_by_name("rtpmoonlightpay_audio");
-  gst_element_register(audio_plugin, "rtpmoonlightpay_audio", GST_RANK_PRIMARY, gst_TYPE_rtp_moonlight_pay_audio);
+  gst_element_register(nullptr, "rtpmoonlightpay_video", GST_RANK_PRIMARY, gst_TYPE_rtp_moonlight_pay_video);
+  gst_element_register(nullptr, "rtpmoonlightpay_audio", GST_RANK_PRIMARY, gst_TYPE_rtp_moonlight_pay_audio);
 
   moonlight::fec::init();
 }
