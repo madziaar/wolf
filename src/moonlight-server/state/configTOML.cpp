@@ -151,7 +151,7 @@ Config load_or_default(const std::string &source,
   if (default_gst_audio_settings.default_sink.find("udpsink") != std::string::npos) {
     logs::log(logs::debug, "Found udpsink in default_sink, migrating to appsink");
     default_gst_audio_settings.default_sink =
-        "rtpmoonlightpay_audio name=moonlight_pay packet_duration={packet_duration} encrypt={encrypt}"
+        "rtpmoonlightpay_audio name=moonlight_pay packet_duration={packet_duration} encrypt={encrypt} "
         "aes_key=\"{aes_key}\" aes_iv=\"{aes_iv}\" ! "
         "appsink sync=false name=wolf_udp_sink";
   }

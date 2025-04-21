@@ -415,7 +415,6 @@ audio-type=restricted-lowdelay max-payload-size=1400\
 default_sink = """
 rtpmoonlightpay_audio name=moonlight_pay packet_duration={packet_duration} encrypt={encrypt} \
 aes_key="{aes_key}" aes_iv="{aes_iv}" !
-queue !
 appsink name=wolf_udp_sink\
 """
 
