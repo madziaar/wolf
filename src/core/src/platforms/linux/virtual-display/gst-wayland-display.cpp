@@ -193,4 +193,24 @@ void WaylandKeyboard::release(unsigned int key_code) {
   gstreamer::send_message(w_state->wayland_plugin.get(), msg);
 }
 
+void WaylandTouchScreen::down(unsigned int touch_id, double x, double y) {
+  // TODO:
+}
+
+void WaylandTouchScreen::up(unsigned int touch_id) {
+  // TODO:
+}
+
+void WaylandTouchScreen::motion(unsigned int touch_id, double x, double y) {
+  // TODO:
+}
+
+void WaylandTouchScreen::cancel() {
+  // TODO:
+}
+
+void WaylandTouchScreen::frame() {
+  // TODO:
+}
+
 } // namespace wolf::core::virtual_display
