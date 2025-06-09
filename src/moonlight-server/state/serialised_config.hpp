@@ -32,12 +32,14 @@ struct PairedClient {
 
 struct GstEncoderDefault {
   std::string video_params;
+  std::string video_params_zero_copy;
 };
 
 struct GstEncoder {
   std::string plugin_name;
   std::vector<std::string> check_elements;
   std::optional<std::string> video_params;
+  std::optional<std::string> video_params_zero_copy;
   std::string encoder_pipeline;
 };
 
@@ -87,7 +89,9 @@ struct AppChildSession {
 struct BaseAppVideoOverride {
   std::optional<std::string> source;
   std::optional<std::string> sink;
+  std::optional<std::string> producer_buffer_caps;
   std::optional<std::string> video_params;
+  std::optional<std::string> video_params_zero_copy;
   std::optional<std::string> h264_encoder;
   std::optional<std::string> hevc_encoder;
   std::optional<std::string> av1_encoder;

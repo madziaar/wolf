@@ -61,6 +61,8 @@ struct Runner {
 struct App {
   moonlight::App base;
 
+  std::string video_producer_buffer_caps;
+
   std::string h264_gst_pipeline;
   std::string hevc_gst_pipeline;
   std::string av1_gst_pipeline;

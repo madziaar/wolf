@@ -1,5 +1,4 @@
 #include <control/control.hpp>
-#include <gstreamer-1.0/gst/video/video-info.h>
 #include <gstreamer-1.0/gst/app/gstappsink.h>
 #include <gstreamer-1.0/gst/app/gstappsrc.h>
 #include <immer/array.hpp>
@@ -48,23 +47,39 @@ gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data) {
   return TRUE;
 }
 
+std::pair<std::string, std::string> get_color_params(immer::box<events::VideoSession> video_session) {
+  std::string color_range = (video_session->color_range == events::ColorRange::JPEG) ? "jpeg" : "mpeg2";
+  std::string color_space;
+  switch (video_session->color_space) {
+  case events::ColorSpace::BT601:
+    color_space = "bt601";
+    break;
+  case events::ColorSpace::BT709:
+    color_space = "bt709";
+    break;
+  case events::ColorSpace::BT2020:
+    color_space = "bt2020";
+    break;
+  }
+  return std::make_pair(color_range, color_space);
+}
+
 void start_video_producer(std::size_t session_id,
+                          const std::string &buffer_format,
                           const std::string &render_node,
-                          const virtual_display::DisplayMode &display_mode,
+                          const wolf::core::virtual_display::DisplayMode &display_mode,
                           std::shared_ptr<boost::promise<WaylandDisplayReady>> on_ready,
                           std::shared_ptr<events::EventBusType> event_bus) {
-  bool use_zero_copy = utils::get_env("WOLF_USE_ZERO_COPY") != nullptr;
-  auto pipeline = fmt::format(
-      "waylanddisplaysrc name=wolf_wayland_source render_node={render_node} ! "
-      "{buffer_format}, width={width}, height={height}, framerate={fps}/1 ! "                  //
-      "queue leaky=downstream max-size-buffers=1 ! "                                                                               //
-      "interpipesink name={session_id}_video sync=true async=false max-buffers=1", //
-      fmt::arg("buffer_format", use_zero_copy ? "video/x-raw(memory:DMABuf)" : "video/x-raw"),
-      fmt::arg("render_node", render_node),
-      fmt::arg("session_id", session_id),
-      fmt::arg("width", display_mode.width),
-      fmt::arg("height", display_mode.height),
-      fmt::arg("fps", display_mode.refreshRate));
+  auto pipeline = fmt::format("waylanddisplaysrc name=wolf_wayland_source "
+                              "render_node={render_node} ! "
+                              "{buffer_format}, width={width}, height={height}, framerate={fps}/1 ! \n" //
+                              "interpipesink sync=true async=false name={session_id}_video max-buffers=1",                    //
+                              fmt::arg("buffer_format", buffer_format),
+                              fmt::arg("render_node", render_node),
+                              fmt::arg("session_id", session_id),
+                              fmt::arg("width", display_mode.width),
+                              fmt::arg("height", display_mode.height),
+                              fmt::arg("fps", display_mode.refreshRate));
   logs::log(logs::debug, "[GSTREAMER] Starting video producer: {}", pipeline);
   auto bus_data_ptr =
       std::make_shared<GstBusData>(GstBusData{.on_ready = std::move(on_ready), .wayland_plugin = nullptr});
@@ -98,15 +113,14 @@ void start_audio_producer(std::size_t session_id,
                           int channel_count,
                           const std::string &sink_name,
                           const std::string &server_name) {
-  auto pipeline = fmt::format(
-      "pulsesrc device=\"{sink_name}\" server=\"{server_name}\" ! " //
-      "audio/x-raw, channels={channels}, rate=48000 ! "             //
-      "queue leaky=downstream max-size-buffers=3 ! "                                                    //
-      "interpipesink name=\"{session_id}_audio\" sync=true async=false max-buffers=3",
-      fmt::arg("session_id", session_id),
-      fmt::arg("channels", channel_count),
-      fmt::arg("sink_name", sink_name),
-      fmt::arg("server_name", server_name));
+  auto pipeline = fmt::format("pulsesrc device=\"{sink_name}\" server=\"{server_name}\" ! " //
+                              "audio/x-raw, channels={channels}, rate=48000 ! "             //
+                              "queue leaky=downstream max-size-buffers=3 ! "                //
+                              "interpipesink name=\"{session_id}_audio\" sync=true async=false max-buffers=3",
+                              fmt::arg("session_id", session_id),
+                              fmt::arg("channels", channel_count),
+                              fmt::arg("sink_name", sink_name),
+                              fmt::arg("server_name", server_name));
   logs::log(logs::debug, "[GSTREAMER] Starting audio producer: {}", pipeline);
 
   run_pipeline(pipeline, [=](auto pipeline, auto loop) {
@@ -200,19 +214,7 @@ void start_streaming_video(immer::box<events::VideoSession> video_session,
                            std::string client_ip,
                            unsigned short client_port,
                            std::shared_ptr<udp::socket> video_socket) {
-  std::string color_range = (video_session->color_range == events::ColorRange::JPEG) ? "jpeg" : "mpeg2";
-  std::string color_space;
-  switch (video_session->color_space) {
-  case events::ColorSpace::BT601:
-    color_space = "bt601";
-    break;
-  case events::ColorSpace::BT709:
-    color_space = "bt709";
-    break;
-  case events::ColorSpace::BT2020:
-    color_space = "bt2020";
-    break;
-  }
+  auto [color_range, color_space] = get_color_params(video_session);
 
   auto pipeline = fmt::format(fmt::runtime(video_session->gst_pipeline),
                               fmt::arg("session_id", video_session->session_id),

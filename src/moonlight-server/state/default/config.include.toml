@@ -18,9 +18,9 @@ name = "WolfFirefox"
 image = "ghcr.io/games-on-whales/firefox:edge"
 mounts = []
 env = [
-  "RUN_SWAY=1",
-  "MOZ_ENABLE_WAYLAND=1",
-  "GOW_REQUIRED_DEVICES=/dev/input/* /dev/dri/* /dev/nvidia*",
+    "RUN_SWAY=1",
+    "MOZ_ENABLE_WAYLAND=1",
+    "GOW_REQUIRED_DEVICES=/dev/input/* /dev/dri/* /dev/nvidia*",
 ]
 devices = []
 ports = []
@@ -46,8 +46,8 @@ name = "WolfRetroarch"
 image = "ghcr.io/games-on-whales/retroarch:edge"
 mounts = []
 env = [
-  "RUN_SWAY=true",
-  "GOW_REQUIRED_DEVICES=/dev/input/* /dev/dri/* /dev/nvidia*",
+    "RUN_SWAY=true",
+    "GOW_REQUIRED_DEVICES=/dev/input/* /dev/dri/* /dev/nvidia*",
 ]
 devices = []
 ports = []
@@ -73,9 +73,9 @@ name = "WolfSteam"
 image = "ghcr.io/games-on-whales/steam:edge"
 mounts = []
 env = [
-  "PROTON_LOG=1",
-  "RUN_SWAY=true",
-  "GOW_REQUIRED_DEVICES=/dev/input/* /dev/dri/* /dev/nvidia*",
+    "PROTON_LOG=1",
+    "RUN_SWAY=true",
+    "GOW_REQUIRED_DEVICES=/dev/input/* /dev/dri/* /dev/nvidia*",
 ]
 devices = []
 ports = []
@@ -103,8 +103,8 @@ name = "WolfPegasus"
 image = "ghcr.io/games-on-whales/pegasus:edge"
 mounts = []
 env = [
-  "RUN_SWAY=1",
-  "GOW_REQUIRED_DEVICES=/dev/input/event* /dev/dri/* /dev/nvidia*",
+    "RUN_SWAY=1",
+    "GOW_REQUIRED_DEVICES=/dev/input/event* /dev/dri/* /dev/nvidia*",
 ]
 devices = []
 ports = []
@@ -130,8 +130,8 @@ name = "WolfLutris"
 image = "ghcr.io/games-on-whales/lutris:edge"
 mounts = ["lutris:/var/lutris/:rw"]
 env = [
-  "RUN_SWAY=1",
-  "GOW_REQUIRED_DEVICES=/dev/input/event* /dev/dri/* /dev/nvidia* /var/lutris/",
+    "RUN_SWAY=1",
+    "GOW_REQUIRED_DEVICES=/dev/input/event* /dev/dri/* /dev/nvidia* /var/lutris/",
 ]
 devices = []
 ports = []
@@ -157,8 +157,8 @@ name = "Prismlauncher"
 image = "ghcr.io/games-on-whales/prismlauncher:edge"
 mounts = []
 env = [
-  "RUN_SWAY=1",
-  "GOW_REQUIRED_DEVICES=/dev/input/event* /dev/dri/* /dev/nvidia* /var/lutris/",
+    "RUN_SWAY=1",
+    "GOW_REQUIRED_DEVICES=/dev/input/event* /dev/dri/* /dev/nvidia* /var/lutris/",
 ]
 devices = []
 ports = []
@@ -199,7 +199,7 @@ source = "audiotestsrc wave=ticks is-live=true"
 
 [gstreamer.video]
 
-default_source = 'interpipesrc listen-to={session_id}_video is-live=true stream-sync=restart-ts max-buffers=1 block=false'
+default_source = 'interpipesrc listen-to={session_id}_video is-live=true stream-sync=restart-ts max-bytes=0 max-buffers=1 leaky-type=downstream'
 default_sink = """
 rtpmoonlightpay_video name=moonlight_pay \
 payload_size={payload_size} fec_percentage={fec_percentage} min_required_fec_packets={min_required_fec_packets} !
@@ -211,25 +211,43 @@ appsink sync=false name=wolf_udp_sink
 # To avoid repetition between H264, HEVC and AV1 encoders
 [gstreamer.video.defaults.nvcodec]
 video_params = """
-queue leaky=downstream max-size-buffers=1 !
 cudaupload !
 cudaconvertscale !
 video/x-raw(memory:CUDAMemory), width={width}, height={height}, \
 chroma-site={color_range}, format=NV12, colorimetry={color_space}, pixel-aspect-ratio=1/1\
 """
 
+video_params_zero_copy = """
+glupload !
+glcolorconvert !
+video/x-raw(memory:GLMemory),format=NV12, width={width}, height={height}, chroma-site={color_range}, \
+colorimetry={color_space}, pixel-aspect-ratio=1/1\
+"""
+
 [gstreamer.video.defaults.qsv]
 video_params = """
-queue leaky=downstream max-size-buffers=1 !
 videoconvertscale !
-video/x-raw, chroma-site={color_range}, width={width}, height={height}, format=NV12, colorimetry={color_space}\
+video/x-raw, chroma-site={color_range}, width={width}, height={height}, format=NV12,
+colorimetry={color_space} pixel-aspect-ratio=1/1\
+"""
+
+video_params_zero_copy = """
+vapostproc !
+video/x-raw(memory:VAMemory),format=NV12, chroma-site={color_range},
+colorimetry={color_space} pixel-aspect-ratio=1/1\
 """
 
 [gstreamer.video.defaults.vaapi]
 video_params = """
-queue leaky=downstream max-size-buffers=1 !
-videoconvertscale !
-video/x-raw, chroma-site={color_range}, width={width}, height={height}, format=NV12, colorimetry={color_space}\
+vapostproc !
+video/x-raw, chroma-site={color_range}, width={width}, height={height}, format=NV12,
+colorimetry={color_space} pixel-aspect-ratio=1/1\
+"""
+
+video_params_zero_copy = """
+vapostproc !
+video/x-raw(memory:VAMemory), chroma-site={color_range}, width={width}, height={height},
+colorimetry={color_space} pixel-aspect-ratio=1/1\
 """
 
 ######################

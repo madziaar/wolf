@@ -220,6 +220,7 @@ auto setup_sessions_handlers(const immer::box<state::AppState> &app_state,
           // Start Gstreamer producer pipeline
           std::thread([session, on_ready]() {
             streaming::start_video_producer(session->session_id,
+                                            session->app->video_producer_buffer_caps,
                                             session->app->render_node,
                                             {.width = session->display_mode.width,
                                              .height = session->display_mode.height,
