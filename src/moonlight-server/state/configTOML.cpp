@@ -245,9 +245,14 @@ Config load_or_default(const std::string &source,
                                cap.find(" ") != std::string::npos;
                       }) | //
                       ranges::to<std::vector>();
-      default_video_producer_buffer_caps =
-          gst_caps.empty() ? "video/x-raw(memory:DMABuf)"
-                           : fmt::format("video/x-raw(memory:DMABuf), drm-format={{{}}}", utils::join(gst_caps, ","));
+      if (gst_caps.empty()) {
+        logs::log(logs::warning,
+                  "Unable to find any compatible DMA formats for vapostproc, disabling zero copy pipeline.");
+        use_zero_copy = false;
+      } else {
+        default_video_producer_buffer_caps =
+            fmt::format("video/x-raw(memory:DMABuf), drm-format={{{}}}", utils::join(gst_caps, ","));
+      }
       break;
     }
     default: {

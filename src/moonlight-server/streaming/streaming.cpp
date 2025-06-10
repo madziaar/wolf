@@ -43,6 +43,8 @@ gboolean bus_watcher(GstBus *bus, GstMessage *msg, gpointer data) {
       gst_structure_foreach(structure, structure_each, data);
     }
   }
+  default: {
+  }
   }
   return TRUE;
 }
@@ -72,8 +74,8 @@ void start_video_producer(std::size_t session_id,
                           std::shared_ptr<events::EventBusType> event_bus) {
   auto pipeline = fmt::format("waylanddisplaysrc name=wolf_wayland_source "
                               "render_node={render_node} ! "
-                              "{buffer_format}, width={width}, height={height}, framerate={fps}/1 ! \n" //
-                              "interpipesink sync=true async=false name={session_id}_video max-buffers=1",                    //
+                              "{buffer_format}, width={width}, height={height}, framerate={fps}/1 ! \n"    //
+                              "interpipesink sync=true async=false name={session_id}_video max-buffers=1", //
                               fmt::arg("buffer_format", buffer_format),
                               fmt::arg("render_node", render_node),
                               fmt::arg("session_id", session_id),
