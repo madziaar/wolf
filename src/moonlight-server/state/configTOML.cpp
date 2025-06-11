@@ -176,7 +176,7 @@ Config load_or_default(const std::string &source,
     update_leaky_queue(default_gst_encoder_settings["qsv"].video_params);
   }
 
-  bool use_zero_copy = utils::get_env("WOLF_USE_ZERO_COPY") != nullptr;
+  bool use_zero_copy = utils::get_env("WOLF_USE_ZERO_COPY", "") != std::string("FALSE");
 
   auto default_app_render_node = utils::get_env("WOLF_RENDER_NODE", "/dev/dri/renderD128");
   auto default_gst_render_node = utils::get_env("WOLF_ENCODER_NODE", default_app_render_node);
