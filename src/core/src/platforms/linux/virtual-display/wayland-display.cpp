@@ -16,6 +16,12 @@ struct WaylandState {
   immer::vector<std::string> graphic_devices{};
 };
 
+static void destroy(WaylandState *w_state) {
+  logs::log(logs::trace, "~WaylandState");
+  display_finish(w_state->display);
+  delete (w_state);
+}
+
 wl_state_ptr create_wayland_display(const immer::array<std::string> &input_devices, const std::string &render_node) {
   logs::log(logs::debug, "[WAYLAND] Creating wayland display");
   auto w_display = display_init(render_node.c_str());
@@ -50,8 +56,8 @@ wl_state_ptr create_wayland_display(const immer::array<std::string> &input_devic
   return {wl_state, &destroy};
 }
 
-std::unique_ptr<GstCaps, decltype(&gst_caps_unref)>
-set_resolution(WaylandState &w_state, const DisplayMode &display_mode, const std::optional<gst_element_ptr> &app_src) {
+std::unique_ptr<GstCaps, decltype(&gst_caps_unref)> set_resolution(
+    WaylandState &w_state, const DisplayMode &display_mode, const std::optional<gstreamer::gst_element_ptr> &app_src) {
   /* clang-format off */
   auto caps = gst_caps_new_simple("video/x-raw",
                                   "width", G_TYPE_INT, display_mode.width,
@@ -85,12 +91,6 @@ immer::vector<std::string> get_env(const WaylandState &w_state) {
 
 GstBuffer *get_frame(WaylandState &w_state) {
   return display_get_frame(w_state.display);
-}
-
-static void destroy(WaylandState *w_state) {
-  logs::log(logs::trace, "~WaylandState");
-  display_finish(w_state->display);
-  delete (w_state);
 }
 
 bool add_input_device(WaylandState &w_state, const std::string &device_path) {
