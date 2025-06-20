@@ -246,7 +246,7 @@ colorimetry={color_space} pixel-aspect-ratio=1/1\
 
 video_params_zero_copy = """
 vapostproc !
-video/x-raw(memory:VAMemory), chroma-site={color_range}, width={width}, height={height},
+video/x-raw(memory:VAMemory), format=NV12, chroma-site={color_range}, width={width}, height={height},
 colorimetry={color_space} pixel-aspect-ratio=1/1\
 """
 
@@ -274,18 +274,18 @@ video/x-h265, profile=main, stream-format=byte-stream\
 
 [[gstreamer.video.hevc_encoders]]
 plugin_name = "va"
-check_elements = ["vah265lpenc", "vapostproc"] # lp: (Low Power)
+check_elements = ["vah265enc", "vapostproc"]
 encoder_pipeline = """
-vah265lpenc aud=false b-frames=0 ref-frames=1 num-slices={slices_per_frame} bitrate={bitrate} cpb-size={bitrate} key-int-max=1024 rate-control=cqp target-usage=6 !
+vah265enc aud=false b-frames=0 ref-frames=1 num-slices={slices_per_frame} bitrate={bitrate} cpb-size={bitrate} key-int-max=1024 rate-control=cqp target-usage=6 !
 h265parse !
 video/x-h265, profile=main, stream-format=byte-stream\
 """
 
 [[gstreamer.video.hevc_encoders]]
 plugin_name = "va"
-check_elements = ["vah265enc", "vapostproc"]
+check_elements = ["vah265lpenc", "vapostproc"] # lp: (Low Power)
 encoder_pipeline = """
-vah265enc aud=false b-frames=0 ref-frames=1 num-slices={slices_per_frame} bitrate={bitrate} cpb-size={bitrate} key-int-max=1024 rate-control=cqp target-usage=6 !
+vah265lpenc aud=false b-frames=0 ref-frames=1 num-slices={slices_per_frame} bitrate={bitrate} cpb-size={bitrate} key-int-max=1024 rate-control=cqp target-usage=6 !
 h265parse !
 video/x-h265, profile=main, stream-format=byte-stream\
 """
@@ -336,6 +336,15 @@ video/x-h264, profile=main, stream-format=byte-stream\
 
 [[gstreamer.video.h264_encoders]]
 plugin_name = "va"
+check_elements = ["vah264enc", "vapostproc"]
+encoder_pipeline = """
+vah264enc aud=false b-frames=0 ref-frames=1 num-slices={slices_per_frame} bitrate={bitrate} cpb-size={bitrate} key-int-max=1024 rate-control=cqp target-usage=6 !
+h264parse !
+video/x-h264, profile=main, stream-format=byte-stream\
+"""
+
+[[gstreamer.video.h264_encoders]]
+plugin_name = "va"
 check_elements = ["vah264lpenc", "vapostproc"] # lp: (Low Power)
 encoder_pipeline = """
 vah264lpenc aud=false b-frames=0 ref-frames=1 num-slices={slices_per_frame} bitrate={bitrate} cpb-size={bitrate} key-int-max=1024 rate-control=cqp target-usage=6 !
@@ -343,14 +352,6 @@ h264parse !
 video/x-h264, profile=main, stream-format=byte-stream\
 """
 
-[[gstreamer.video.h264_encoders]]
-plugin_name = "va"
-check_elements = ["vah264enc", "vapostproc"]
-encoder_pipeline = """
-vah264enc aud=false b-frames=0 ref-frames=1 num-slices={slices_per_frame} bitrate={bitrate} cpb-size={bitrate} key-int-max=1024 rate-control=cqp target-usage=6 !
-h264parse !
-video/x-h264, profile=main, stream-format=byte-stream\
-"""
 
 [[gstreamer.video.h264_encoders]]
 plugin_name = "x264" # SW Encoding
