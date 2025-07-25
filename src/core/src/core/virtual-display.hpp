@@ -26,7 +26,7 @@ bool add_input_device(WaylandState &w_state, const std::string &device_path);
 
 class WaylandMouse {
 public:
-  WaylandMouse(wl_state_ptr w_state) : w_state(w_state) {};
+  WaylandMouse(wl_state_ptr w_state) : w_state(w_state){};
 
   void move(int delta_x, int delta_y);
 
@@ -46,7 +46,7 @@ private:
 
 class WaylandKeyboard {
 public:
-  WaylandKeyboard(wl_state_ptr w_state) : w_state(w_state) {};
+  WaylandKeyboard(wl_state_ptr w_state) : w_state(w_state){};
 
   void press(unsigned int key_code);
 
